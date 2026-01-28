@@ -3,14 +3,15 @@ import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 
 export type FileVisibility = 'public' | 'private';
 
 @Entity({ name: 'files' })
+@Index('idx_files_app_tenant_created', ['app', 'tenantId', 'createdAt'])
+@Index('idx_files_app_owner_created', ['app', 'ownerId', 'createdAt'])
 export class File {
-
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
     @Index()
     @Column({ length: 50 })
-    app: string; // 
+    app: string;
 
     @Index()
     @Column({ nullable: true, length: 80 })
@@ -26,7 +27,6 @@ export class File {
     @Column({ length: 120 })
     bucket: string;
 
-    @Index()
     @Column({ length: 900 })
     objectKey: string;
 
