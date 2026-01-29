@@ -1,10 +1,11 @@
 import { Controller, Get, Param, Post, Query, UploadedFile, UseInterceptors, Body, Delete } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { FilesService } from './files.service';
+import { BatchFileUrlsDto } from './dto/batch-file.dto';
 
 @Controller('files')
 export class FilesController {
-  constructor(private readonly files: FilesService) {}
+  constructor(private readonly files: FilesService) { }
 
   @Post('upload')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 200 * 1024 * 1024 } }))
@@ -16,6 +17,11 @@ export class FilesController {
     @Query('ownerId') ownerId?: string,
   ) {
     return this.files.upload({ file, app: app || 'default', visibility, tenantId, ownerId });
+  }
+
+  @Post('urls')
+  async urlsBatch(@Body() dto: BatchFileUrlsDto) {
+    return this.files.getDownloadUrlsBatch(dto.ids);
   }
 
   @Get('url/:id')

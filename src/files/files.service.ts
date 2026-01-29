@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import * as path from 'path';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { File } from './entities/file.entity';
 import { S3Service } from './s3.service';
 
@@ -34,7 +34,7 @@ export class FilesService {
     const filename = `${base}_${randomUUID()}${ext}`;
 
     const prefix = params.visibility === 'public' ? 'public' : 'private';
-    const objectKey = `${prefix}/${params.app}/${params.tenantId ?? 'default'}/${filename}`;
+    const objectKey = `${prefix}/${params.app}/${filename}`;
 
     await this.s3.putObject({
       bucket,
@@ -66,13 +66,45 @@ export class FilesService {
 
     if (file.visibility === 'public') {
       const base = this.config.get('S3_PUBLIC_BASE_URL');
-      // base: https://s3.../media
       return { url: `${base}/${file.objectKey}` };
     }
 
     const expires = Number(this.config.get('PRESIGN_EXPIRES_SECONDS') || 600);
     const url = await this.s3.presignGetUrl(file.bucket, file.objectKey, expires);
     return { url };
+  }
+
+  async getDownloadUrlsBatch(ids: string[]) {
+    const cleanIds = Array.from(
+      new Set(
+        (ids || [])
+          .filter((x) => typeof x === 'string')
+          .map((x) => x.trim())
+          .filter((x) => x.length > 0),
+      ),
+    ).slice(0, 1000);
+
+    if (cleanIds.length === 0) return { urls: {} as Record<string, string> };
+
+    const files = await this.repo.find({ where: { id: In(cleanIds) } });
+
+    const expires = Number(this.config.get('PRESIGN_EXPIRES_SECONDS') || 600);
+    const base = this.config.get('S3_PUBLIC_BASE_URL');
+
+    const urlsEntries = await Promise.all(
+      files.map(async (f) => {
+        if (f.visibility === 'public') {
+          return [f.id, `${base}/${f.objectKey}`] as const;
+        }
+        const url = await this.s3.presignGetUrl(f.bucket, f.objectKey, expires);
+        return [f.id, url] as const;
+      }),
+    );
+
+    const urls: Record<string, string> = {};
+    for (const [id, url] of urlsEntries) urls[id] = url;
+
+    return { urls };
   }
 
   async remove(fileId: string) {
