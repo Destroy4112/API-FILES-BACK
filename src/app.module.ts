@@ -18,7 +18,7 @@ import { FilesModule } from './files/files.module';
         password: config.get('DB_PASS'),
         database: config.get('DB_NAME'),
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
-        synchronize: true,
+        synchronize: false,
       }),
     }),
     FilesModule
